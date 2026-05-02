@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const connectDB = require('./config/dbConn');
 
+const passport = require('./config/passport');
 const authRoutes = require('./routes/auth');
 const rulesRoutes = require('./routes/rules');
 const shareRoutes = require('./routes/share');
@@ -22,6 +23,11 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+app.use(passport.initialize());
+app.use((req, _res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  next();
+});
 
 app.use('/auth', authRoutes);
 app.use('/rules', rulesRoutes);

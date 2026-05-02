@@ -1,6 +1,6 @@
-const User = require('../models/User');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const passport = require('../config/passport');
+const User = require('../models/User');
 
 const generateAccessToken = (userId) =>
   jwt.sign({ id: userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
@@ -8,64 +8,35 @@ const generateAccessToken = (userId) =>
 const generateRefreshToken = (userId) =>
   jwt.sign({ id: userId }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
 
-const register = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password)
-    return res.status(400).json({ message: 'Email and password are required.' });
-
-  const existing = await User.findOne({ email });
-  if (existing)
-    return res.status(409).json({ message: 'Email already in use.' });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await User.create({ email, password: hashedPassword });
-
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = refreshToken;
-  await user.save();
-
-  res.cookie('jwt', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  res.status(201).json({ accessToken });
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'Strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-const login = async (req, res) => {
-  const { email, password } = req.body;
+const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'], session: false });
 
-  if (!email || !password)
-    return res.status(400).json({ message: 'Email and password are required.' });
+const googleAuthCallback = (req, res, next) => {
+  passport.authenticate('google', { session: false }, async (err, user) => {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 
-  const user = await User.findOne({ email });
-  if (!user)
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    if (err || !user)
+      return res.redirect(`${clientUrl}/auth/error?reason=unauthorized`);
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match)
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    try {
+      const accessToken = generateAccessToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
 
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+      user.refreshToken = refreshToken;
+      await user.save();
 
-  user.refreshToken = refreshToken;
-  await user.save();
-
-  res.cookie('jwt', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  res.json({ accessToken });
+      res.cookie('jwt', refreshToken, COOKIE_OPTIONS);
+      res.redirect(`${clientUrl}/auth/callback?token=${accessToken}`);
+    } catch (e) {
+      next(e);
+    }
+  })(req, res, next);
 };
 
 const refresh = async (req, res) => {
@@ -90,8 +61,7 @@ const refresh = async (req, res) => {
 
 const logout = async (req, res) => {
   const cookies = req.cookies;
-  if (!cookies?.jwt)
-    return res.sendStatus(204);
+  if (!cookies?.jwt) return res.sendStatus(204);
 
   const refreshToken = cookies.jwt;
 
@@ -110,4 +80,10 @@ const logout = async (req, res) => {
   res.sendStatus(204);
 };
 
-module.exports = { register, login, refresh, logout };
+const getMe = async (req, res) => {
+  const user = await User.findById(req.userId).select('-refreshToken');
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+  res.json(user);
+};
+
+module.exports = { googleAuth, googleAuthCallback, refresh, logout, getMe };

@@ -24,8 +24,6 @@ const ruleSchema = new mongoose.Schema({
   versions: [versionSchema],
   shareToken: {
     type: String,
-    default: null,
-    unique: true,
     sparse: true,
   },
   deletedAt: {

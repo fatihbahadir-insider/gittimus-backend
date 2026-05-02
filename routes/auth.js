@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, refresh, logout } = require('../controllers/authController');
+const verifyJWT = require('../middleware/verifyJWT');
+const { googleAuth, googleAuthCallback, refresh, logout, getMe } = require('../controllers/authController');
 
-router.post('/register', register);
-router.post('/login', login);
+router.get('/google', googleAuth);
+router.get('/google/callback', googleAuthCallback);
+router.get('/me', verifyJWT, getMe);
 router.get('/refresh', refresh);
 router.post('/logout', logout);
 
