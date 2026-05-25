@@ -4,7 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
+const swaggerUi = require('swagger-ui-express');
 const connectDB = require('./config/dbConn');
+const swaggerSpec = require('./config/swagger');
 
 const passport = require('./config/passport');
 const authRoutes = require('./routes/auth');
@@ -28,6 +30,9 @@ app.use((req, _res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use('/auth', authRoutes);
 app.use('/rules', rulesRoutes);
