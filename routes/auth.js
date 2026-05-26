@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const verifyJWT = require('../middleware/verifyJWT');
-const { googleAuth, googleAuthCallback, refresh, logout, getMe } = require('../controllers/authController');
+const googleAuth = require('../middleware/googleAuth');
+const { googleAuthCallback, refresh, logout, getMe, extensionCallback } = require('../controllers/authController');
 
 /**
  * @openapi
@@ -143,5 +144,7 @@ router.get('/refresh', refresh);
  *         description: Logged out successfully (no body).
  */
 router.post('/logout', logout);
+
+router.get('/callback', extensionCallback);
 
 module.exports = router;

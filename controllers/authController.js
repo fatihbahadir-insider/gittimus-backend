@@ -15,14 +15,15 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'], session: false });
-
 const googleAuthCallback = (req, res, next) => {
   passport.authenticate('google', { session: false }, async (err, user) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const isExtension = req.query.state === 'extension';
 
-    if (err || !user)
-      return res.redirect(`${clientUrl}/auth/error?reason=unauthorized`);
+    if (err || !user) {
+      const base = isExtension ? '' : clientUrl;
+      return res.redirect(`${base}/auth/error?reason=unauthorized`);
+    }
 
     try {
       const accessToken = generateAccessToken(user._id);
@@ -32,6 +33,10 @@ const googleAuthCallback = (req, res, next) => {
       await user.save();
 
       res.cookie('jwt', refreshToken, COOKIE_OPTIONS);
+
+      if (isExtension) {
+        return res.redirect(`/auth/callback?token=${accessToken}`);
+      }
       res.redirect(`${clientUrl}/auth/callback?token=${accessToken}`);
     } catch (e) {
       next(e);
@@ -86,4 +91,8 @@ const getMe = async (req, res) => {
   res.json(user);
 };
 
-module.exports = { googleAuth, googleAuthCallback, refresh, logout, getMe };
+const extensionCallback = (_req, res) => {
+  res.send('<html><body><script>window.close();</script>Login successful. You can close this tab.</body></html>');
+};
+
+module.exports = { googleAuthCallback, refresh, logout, getMe, extensionCallback };
